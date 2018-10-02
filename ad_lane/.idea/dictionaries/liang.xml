@@ -2,6 +2,9 @@
   <dictionary name="liang">
     <words>
       <w>arctan</w>
+      <w>imread</w>
+      <w>matplotlib</w>
+      <w>mpimg</w>
       <w>sobel</w>
       <w>uint</w>
     </words>

@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 import glob
-import pickle
-import matplotlib.image as mpimg
+# import pickle
+# import matplotlib.image as mpimg
 
 
 def calibrate_camera(nx, ny, cal_images_path):
@@ -165,14 +165,35 @@ def hls_select(img, channel='S', thresh=(90, 255)):
     return binary_output
 
 
+def luv_select(img, thresh=(0, 255)):
+    luv = cv2.cvtColor(img, cv2.COLOR_RGB2LUV)
+    l_channel = luv[:, :, 0]
+    binary_output = np.zeros_like(l_channel)
+    binary_output[(l_channel > thresh[0]) & (l_channel <= thresh[1])] = 1
+
+    return binary_output
+
+
+def lab_select(img, thresh=(0, 255)):
+    lab = cv2.cvtColor(img, cv2.COLOR_RGB2Lab)
+    b_channel = lab[:, :, 2]
+    binary_output = np.zeros_like(b_channel)
+    binary_output[(b_channel > thresh[0]) & (b_channel <= thresh[1])] = 1
+
+    return binary_output
+
+
 def combine_filters(img):
-    grad_x = abs_sobel_thresh(img, orient='x', sobel_kernel=3, thresh=(20, 255))
-    l_binary = hls_select(img, channel='L', thresh=(100, 200))
-    s_binary = hls_select(img, channel='S', thresh=(100, 255))
-    yw_binary = yellow_white_mask(img)
-    yw_binary[(yw_binary != 0)] = 1
+    grad_x = abs_sobel_thresh(img, orient='x', sobel_kernel=3, thresh=(10, 230))
+    mag = mag_thresh(img, sobel_kernel=3, thresh=(30, 150))
+    dir_thresh = dir_threshold(img, sobel_kernel=3, thresh=(0.7, 1.3))
+    hls_thresh = hls_select(img, thresh=(180, 255))
+    lab_thresh = lab_select(img, thresh=(155, 200))
+    luv_thresh = luv_select(img, thresh=(225, 255))
     combined_lsx = np.zeros_like(grad_x)
-    combined_lsx[((l_binary == 1) & (s_binary == 1) | (grad_x == 1) | (yw_binary == 1))] = 1
+    combined_lsx[((grad_x == 1) & (mag == 1)) | ((dir_thresh == 1) & (hls_thresh == 1)) |
+                 (lab_thresh == 1) | (luv_thresh == 1)] = 1
+
     return combined_lsx
 
 
@@ -318,22 +339,13 @@ def draw_values(img, curvature, distance_from_center):
     return img
 
 
-def advanced_lane_pip(test_image):
-    file_para = open('calibration_parameters.pkl', 'rb')
-    dist_pickle = pickle.load(file_para)
-    mtx = dist_pickle['mtx']
-    dist = dist_pickle['dist']
-    file_para.close()
-
-    origin_img = mpimg.imread(test_image)
+def advanced_lane_pip(origin_img, mtx, dist, m, m_back):
+    # 在这个pip函数中不能出现任何的读取图像之类的函数
+    # origin_img = mpimg.imread(test_image)
+    # origin_img = cv2.imread(test_image)
+    # origin_img = cv2.cvtColor(origin_img, cv2.COLOR_BGR2RGB)
 
     test_img = cal_undistorted(origin_img, mtx, dist)
-
-    file_para = open('perspective_parameters.pkl', 'rb')
-    dist_pickle = pickle.load(file_para)
-    m = dist_pickle['M']
-    m_back = dist_pickle['M_back']
-    file_para.close()
 
     img_size = (test_img.shape[1], test_img.shape[0])  # 先是宽度，再是高度
     wrap_img = cv2.warpPerspective(test_img, m, img_size)
